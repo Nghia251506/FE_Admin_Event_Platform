@@ -6,6 +6,7 @@ import userReducer from './slices/userSlice';
 import permissionReducer from './slices/permissionSlice';
 import customerReducer from "./slices/customerSlice";
 import dashboardReducer from "./slices/dashboardSlice";
+import fcmReducer from "./slices/fcmSlice"
 
 export const store = configureStore({
   reducer: {
@@ -15,7 +16,8 @@ export const store = configureStore({
     users: userReducer,
     permissions: permissionReducer,
     customers: customerReducer,
-    dashboard: dashboardReducer
+    dashboard: dashboardReducer,
+    fcm: fcmReducer
     // sessions: sessionReducer,
     // adminDisputes: adminDisputeReducer,
     // interpretation: interpretationReducer

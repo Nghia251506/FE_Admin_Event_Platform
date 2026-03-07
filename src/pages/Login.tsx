@@ -5,7 +5,9 @@ import { motion } from 'framer-motion';
 import { loginUser } from '@/store/slices/authSlice';
 import { AppDispatch, RootState } from '@/store/store';
 import { Lock, User, Eye, EyeOff, Loader2 } from 'lucide-react';
-
+import { registerFcmToken } from '@/store/slices/fcmSlice'; 
+import { getToken } from "firebase/messaging";
+import { messaging } from "@/lib/firebaseConfig";
 const LoginPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({ username: '', password: '' });
@@ -20,7 +22,29 @@ const LoginPage: React.FC = () => {
     
     if (loginUser.fulfilled.match(resultAction)) {
       const user = resultAction.payload;
-      // Phân luồng sau login dựa trên role mà ae mình đã bàn
+
+      // 🔥 THÊM LOGIC ĐĂNG KÝ FCM NGAY TẠI ĐÂY
+      try {
+        if (messaging) {
+          const permission = await Notification.requestPermission();
+          if (permission === "granted") {
+            const token = await getToken(messaging, {
+              vapidKey: "BBTUhjveP6qB3Hi5Tucv53td40FymzdGJ8TSvpcOPI9Wnu2ecwvx_X5uZ3IHTTby_kA3Sq4yNHF_kqDgUisxks4"
+            });
+            
+            if (token) {
+              // Gọi dispatch đăng ký token lên server
+              await dispatch(registerFcmToken({ userId: user.id, token }));
+              console.log("FCM đăng ký thành công sau login");
+            }
+          }
+        }
+      } catch (fcmError) {
+        console.error("Không thể đăng ký FCM lúc login:", fcmError);
+        // Không chặn luồng navigate của user nếu FCM lỗi
+      }
+
+      // Phân luồng chuyển hướng
       if (user.roleName === 'SUPER_ADMIN') {
         navigate('/admin/');
       } else {

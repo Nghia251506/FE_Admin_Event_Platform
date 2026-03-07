@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import DashboardTenant from "@/pages/Tenant/DashboardTenant"
-import Events from './pages/Events';
+// import Events from './pages/Events';
 import LionTeams from './pages/LionTeams';
 import Customers from './pages/Customers';
 import Services from './pages/Services';
@@ -29,7 +29,7 @@ const App: React.FC = () => {
         <Route path="/" element={<LoginPage />} />
         <Route path="/admin" element={<PrivateRoute allowedRoles={['SUPER_ADMIN']}><Layout /></PrivateRoute>}>
           <Route index element={<Dashboard />} />
-          <Route path="events" element={<Events />} />
+          {/* <Route path="events" element={<Events />} /> */}
           <Route path="lion-teams" element={<LionTeams />} />
           <Route path="customers" element={<Customers />} />
           <Route path="services" element={<Services />} />

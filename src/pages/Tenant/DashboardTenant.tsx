@@ -14,6 +14,7 @@ import { fetchDashboardSummary } from '@/store/slices/dashboardSlice';
 const Dashboard: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   const { data, loading, error } = useSelector((state: RootState) => state.dashboard);
+  const { users } = useSelector((state: RootState) => state.users);
 
   useEffect(() => {
     dispatch(fetchDashboardSummary());
@@ -92,7 +93,7 @@ const Dashboard: React.FC = () => {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-display font-bold text-white mb-2">
-              Chào mừng trở lại, Đội Rồng Vàng! 🐉
+              Tổng quan hệ thống
             </h1>
             <p className="text-dark-300">
               Hệ thống đã sẵn sàng cho <span className="text-primary-400 font-bold">{data.upcomingEvents.length} lịch diễn</span> sắp tới.

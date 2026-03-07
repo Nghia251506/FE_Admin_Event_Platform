@@ -2,6 +2,10 @@ import React, { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from './SidebarTenant';
 import Header from './HeaderTenant';
+import { ToastContainer } from 'react-toastify';
+import {FCMInitializer} from './common/FCMInitializer';
+import ModalFCMGlobal from './fcm/ModalFCMGlobal'
+import ToastFCMContainer from './fcm/ModalFCMGlobal';
 
 const Layout: React.FC = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -21,6 +25,23 @@ const Layout: React.FC = () => {
         }`}
       >
         <div className="p-6">
+          <FCMInitializer /> 
+          
+          {/* Modal nổ ra ở tầng cao nhất của App */}
+          <ToastFCMContainer />
+          
+          <ToastContainer 
+            position="top-right"
+            autoClose={5000}
+            hideProgressBar={false}
+            newestOnTop={false}
+            closeOnClick
+            rtl={false}
+            pauseOnFocusLoss
+            draggable
+            pauseOnHover
+            theme="colored" // Dùng theme colored cho nó rực rỡ đúng chất lễ hội
+          />
           <Outlet />
         </div>
       </main>

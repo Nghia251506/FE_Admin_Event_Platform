@@ -1,191 +1,181 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { 
   Calendar, Clock, MapPin, DollarSign, 
-  Filter, ChevronLeft, ChevronRight, Loader2, 
-  Plus
+  ChevronLeft, ChevronRight, Loader2, 
+  Plus, Tag
 } from 'lucide-react';
-import { fetchEvents, fetchMonthlySummary } from '@/store/slices/eventSlice';
+
+import { 
+  fetchMonthlySchedule, 
+  fetchMonthlySummary, 
+  fetchEventWithMembers, 
+  assignMembersToEvent 
+} from '@/store/slices/eventSlice';
+
+// Tiêm Thunk từ userSlice theo ý ông giáo
+import { fetchUsers } from '@/store/slices/userSlice'; 
 import { RootState, AppDispatch } from '@/store/store';
+
+import { CustomModal } from '@/global/modal/CustomModal';
+import EventForm from '@/components/Event/EventForm';
+import EventDetail from '@/components/Event/EventDetail';
+import AssignMemberForm from '@/components/Event/AssignMemberForm';
 
 const Schedule: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
   
-  // 1. Quản lý State: Để trống new Date() để mặc định lấy tháng/năm hiện tại của máy tính
+  // 1. Quản lý State điều hướng & Modal
   const [date, setDate] = useState(new Date()); 
-  
-  // 2. Lấy data từ Redux
-  const { events, summary, loading } = useSelector((state: RootState) => state.events);
-  const user = useSelector((state: RootState) => state.auth.user);
-  
-  // Kiểm tra quyền Admin/Quản lý để gọi API tương ứng
-  const isAdmin = user?.roleName === 'ADMIN' || user?.roleName === 'TN_MEMBER';
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [isAssignOpen, setIsAssignOpen] = useState(false);
+  const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
 
-  // 3. Effect: Tự động gọi lại API mỗi khi 'date' (Tháng/Năm) thay đổi
+  // 2. Lấy data từ Redux
+  const { events, summary, loading, currentEventWithMembers } = useSelector((state: RootState) => state.events);
+  
+  // Lấy danh sách users từ userSlice (action fetchUsers trả về PageResponse nên mình lấy .content)
+  const { users } = useSelector((state: RootState) => state.users);
+
+  // 3. Effect: Gọi API theo tháng & Load danh sách anh em
   useEffect(() => {
     const month = date.getMonth() + 1;
     const year = date.getFullYear();
 
-    // Gọi danh sách sự kiện
-    dispatch(fetchEvents({ 
-      isAdmin, 
-      params: { month, year, page: 0, size: 50 } // Tăng size lên tí cho bõ công lướt
-    }));
+    dispatch(fetchMonthlySchedule({ month, year, page: 0 }));
+    dispatch(fetchMonthlySummary({ month, year }));
     
-    // Gọi tóm tắt thống kê tháng
-    dispatch(fetchMonthlySummary({ isAdmin, month, year }));
-  }, [dispatch, date, isAdmin]);
+    // Load anh em để gán vào show (Lấy size lớn để không bị sót người)
+    dispatch(fetchUsers({ page: 0, size: 100 })); 
+  }, [dispatch, date]);
 
-  // 4. Logic chuyển tháng (Immutability: tạo object Date mới để trigger re-render)
-  const handlePrevMonth = () => {
-    setDate(new Date(date.getFullYear(), date.getMonth() - 1));
+  // 4. Handlers
+  const handlePrevMonth = () => setDate(new Date(date.getFullYear(), date.getMonth() - 1));
+  const handleNextMonth = () => setDate(new Date(date.getFullYear(), date.getMonth() + 1));
+
+  const handleOpenDetail = (eventId: number) => {
+    setSelectedEventId(eventId);
+    dispatch(fetchEventWithMembers(eventId));
+    setIsDetailOpen(true);
   };
 
-  const handleNextMonth = () => {
-    setDate(new Date(date.getFullYear(), date.getMonth() + 1));
+  const handleOpenAssign = () => {
+    setIsDetailOpen(false);
+    setIsAssignOpen(true);
   };
 
-  const formatMonthDisplay = () => {
-    return `Tháng ${date.getMonth() + 1}, ${date.getFullYear()}`;
+  const onAssignSubmit = async (data: any) => {
+    if (selectedEventId) {
+      try {
+        await dispatch(assignMembersToEvent({ id: selectedEventId, members: data })).unwrap();
+        setIsAssignOpen(false);
+        // Load lại chi tiết show để thấy danh sách vừa gán
+        dispatch(fetchEventWithMembers(selectedEventId));
+      } catch (err) {
+        console.error("Lỗi gán nhân sự:", err);
+      }
+    }
   };
 
-  // Helper định dạng tiền tệ
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('vi-VN', { 
-      style: 'currency', 
-      currency: 'VND' 
-    }).format(amount);
+    return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
   };
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Page Header */}
+    <div className="space-y-6 animate-fade-in pb-10">
+      {/* --- HEADER --- */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-display font-bold text-white mb-2 flex items-center gap-2">
-            Lịch Diễn <span className="text-sm font-normal text-dark-500 bg-dark-800 px-2 py-1 rounded">Beta</span>
+          <h1 className="text-3xl font-display font-bold text-white mb-1 flex items-center gap-3">
+            Lịch Diễn
+            <span className="text-[10px] bg-primary-500/20 text-primary-400 px-2 py-0.5 rounded-full border border-primary-500/30 uppercase tracking-widest">Hệ Thống</span>
           </h1>
-          <p className="text-dark-400">Theo dõi dòng chảy sự kiện của đội lân</p>
+          <p className="text-dark-400 text-sm italic">Quản lý lịch trình và nhân sự đi show</p>
         </div>
+        
         <button 
-          onClick={() => {/* Logic mở Modal thêm mới */}}
-          className="bg-gradient-to-r from-primary-600 to-accent-600 hover:from-primary-500 hover:to-accent-500 text-white font-bold py-2.5 px-6 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-primary-900/20 transition-all active:scale-95"
+          onClick={() => setIsModalOpen(true)}
+          className="bg-gradient-to-r from-primary-600 to-primary-400 text-white font-bold py-3 px-8 rounded-2xl flex items-center gap-2 active:scale-95 transition-all shadow-lg shadow-primary-900/20"
         >
-          <Plus size={20} />
-          <span>Thêm Lịch Diễn</span>
+          <Plus size={20} strokeWidth={3} />
+          <span>Lên Lịch Mới</span>
         </button>
       </div>
 
-      {/* Calendar Navigation & Filters */}
-      <div className="card border-dark-800 bg-dark-900/50 backdrop-blur-sm">
-        <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
-          {/* Bộ điều hướng tháng */}
+      {/* --- BỘ LỌC THÁNG & STATS --- */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <div className="lg:col-span-1 card bg-dark-900/80 border-dark-700 flex flex-col justify-center items-center py-6 shadow-xl">
           <div className="flex items-center gap-6">
-            <button 
-              onClick={handlePrevMonth} 
-              className="p-3 hover:bg-dark-800 text-dark-400 hover:text-primary-500 rounded-full transition-all border border-transparent hover:border-dark-700"
-            >
-              <ChevronLeft size={24} />
-            </button>
-            <div className="text-center min-w-[180px]">
-              <h2 className="text-2xl font-display font-bold text-white tracking-tight">
-                {formatMonthDisplay()}
-              </h2>
-              {loading && <span className="text-[10px] text-primary-500 uppercase tracking-widest animate-pulse">Đang đồng bộ...</span>}
+            <button onClick={handlePrevMonth} className="p-2 hover:bg-dark-800 rounded-full text-dark-400 transition-colors"><ChevronLeft size={28} /></button>
+            <div className="text-center min-w-[100px]">
+              <span className="text-xs text-primary-500 font-bold uppercase tracking-tighter">Tháng {date.getMonth() + 1}</span>
+              <h2 className="text-3xl font-display font-black text-white">{date.getFullYear()}</h2>
             </div>
-            <button 
-              onClick={handleNextMonth} 
-              className="p-3 hover:bg-dark-800 text-dark-400 hover:text-primary-500 rounded-full transition-all border border-transparent hover:border-dark-700"
-            >
-              <ChevronRight size={24} />
-            </button>
+            <button onClick={handleNextMonth} className="p-2 hover:bg-dark-800 rounded-full text-dark-400 transition-colors"><ChevronRight size={28} /></button>
           </div>
+        </div>
 
-          {/* Action Buttons */}
-          <div className="flex items-center gap-3 w-full lg:w-auto">
-            <button className="flex-1 lg:flex-none btn-secondary flex items-center justify-center gap-2 text-sm py-2.5 px-4 border-dark-700">
-              <Filter size={18} />
-              <span>Lọc nâng cao</span>
-            </button>
-            <button className="flex-1 lg:flex-none px-4 py-2.5 bg-accent-600/10 text-accent-400 border border-accent-600/20 rounded-lg hover:bg-accent-600 hover:text-white transition-all text-sm font-medium">
-              Xuất PDF/Excel
-            </button>
-          </div>
+        <div className="lg:col-span-3 grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <StatCard title="Tổng Show" value={summary?.totalEvents || 0} unit="Show" color="blue" />
+          <StatCard title="Doanh Thu" value={formatCurrency(summary?.estimatedRevenue || 0)} unit="" color="accent" />
+          <StatCard title="Hoàn Thành" value={`${summary?.completionRate || 0}%`} unit="" color="green" />
         </div>
       </div>
 
-      {/* Events Timeline */}
+      {/* --- DANH SÁCH SHOW --- */}
       <div className="space-y-4">
         {loading && events.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-dark-500">
-            <Loader2 className="animate-spin mb-4 text-primary-500" size={40} />
-            <p>Đang tra cứu lịch diễn...</p>
+          <div className="flex flex-col items-center justify-center py-20 text-dark-500 gap-4">
+            <Loader2 className="animate-spin text-primary-500" size={48} />
+            <p className="animate-pulse">Đang tải lịch diễn...</p>
           </div>
         ) : events.length === 0 ? (
-          <div className="text-center py-16 card border-dashed border-dark-700 bg-transparent">
-            <Calendar size={48} className="mx-auto text-dark-600 mb-4 opacity-20" />
-            <p className="text-dark-400 font-medium">Tháng này chưa có lịch diễn nào được ghi nhận</p>
-            <button onClick={() => setDate(new Date())} className="mt-4 text-primary-500 text-sm hover:underline">Về tháng hiện tại</button>
+          <div className="text-center py-20 card border-dashed border-dark-800 bg-transparent text-dark-500">
+             <Calendar size={60} className="mx-auto mb-4 opacity-10" />
+             <p className="font-medium">Chưa có show nào được ghi nhận trong tháng này.</p>
           </div>
         ) : (
           events.map((event) => (
-            <div key={event.id} className="card hover:border-primary-600/40 transition-all cursor-pointer group relative overflow-hidden">
-              {/* Trang trí nhẹ ở góc nếu show đã xác nhận */}
-              {event.status === 'ACCEPTED' && (
-                <div className="absolute top-0 right-0 w-16 h-16">
-                  <div className="absolute transform rotate-45 bg-green-500/10 text-green-500 text-[10px] font-bold py-1 right-[-35px] top-[15px] w-[120px] text-center uppercase tracking-tighter">
-                    Confirmed
-                  </div>
-                </div>
-              )}
-              
-              <div className="flex flex-col md:flex-row gap-5">
-                {/* Date Badge */}
-                <div className="flex-shrink-0">
-                  <div className="w-20 h-20 bg-dark-800 border border-dark-700 rounded-2xl flex flex-col items-center justify-center group-hover:border-primary-600/50 transition-colors">
-                    <span className="text-3xl font-display font-bold text-white">
-                      {new Date(event.eventDate).getDate()}
-                    </span>
-                    <span className="text-xs font-bold text-primary-500 uppercase">
-                      T{new Date(event.eventDate).getMonth() + 1}
-                    </span>
-                  </div>
+            <div 
+              key={event.id} 
+              onClick={() => handleOpenDetail(event.id)}
+              className="card bg-dark-900/40 hover:bg-dark-800/60 border-dark-800 hover:border-primary-500/50 transition-all group cursor-pointer relative overflow-hidden shadow-lg"
+            >
+              <div className="flex flex-col md:flex-row gap-6">
+                {/* Badge Ngày */}
+                <div className="flex flex-row md:flex-col items-center justify-center bg-dark-800 rounded-2xl p-4 min-w-[110px] border border-dark-700 group-hover:bg-dark-700 transition-colors">
+                  <span className="text-4xl font-black text-white">{new Date(event.eventDate).getDate()}</span>
+                  <span className="text-[10px] font-bold text-dark-400 uppercase tracking-widest">T. {new Date(event.eventDate).getMonth() + 1}</span>
                 </div>
 
-                {/* Event Details */}
-                <div className="flex-1">
-                  <div className="flex flex-col md:flex-row md:items-start justify-between mb-4 gap-2">
+                {/* Info */}
+                <div className="flex-1 space-y-3">
+                  <div className="flex justify-between items-start">
                     <div>
-                      <h3 className="text-xl font-bold text-white group-hover:text-primary-400 transition-colors mb-1">
-                        {event.name}
-                      </h3>
-                      <div className="flex items-center gap-2 text-dark-400">
-                        <span className="bg-dark-700 text-[10px] px-2 py-0.5 rounded text-dark-200 uppercase font-bold tracking-wider">
-                          {event.customerName || 'Khách lẻ'}
-                        </span>
-                        <span className="text-sm">• {event.customerPhone}</span>
+                      <div className="flex items-center gap-2 mb-1">
+                        <Tag size={14} className="text-primary-500" />
+                        <span className="text-[10px] font-bold text-primary-500 uppercase tracking-wider">{event.typeDisplayName}</span>
                       </div>
+                      <h3 className="text-xl font-bold text-white group-hover:text-primary-400 transition-colors">{event.name}</h3>
                     </div>
-                    <div className={`self-start badge py-1 px-3 rounded-full text-[11px] font-bold uppercase tracking-wider ${
-                      event.status === 'ACCEPTED' 
-                        ? 'bg-green-500/10 text-green-500 border border-green-500/20' 
-                        : 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/20'
-                    }`}>
-                      {event.status === 'ACCEPTED' ? 'Đã xác nhận' : 'Chờ duyệt'}
-                    </div>
+                    <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase border ${getStatusStyle(event.status)}`}>
+                      {event.statusDisplayName}
+                    </span>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
-                    <div className="flex items-center gap-3 text-dark-300">
-                      <div className="p-2 bg-dark-800 rounded-lg"><Clock size={16} className="text-primary-500" /></div>
-                      <span className="text-sm font-medium">{event.startTime} - {event.endTime}</span>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="flex items-center gap-2 text-dark-300 text-sm bg-dark-800/50 p-2 rounded-lg">
+                      <Clock size={16} className="text-primary-500" />
+                      <span className="font-medium">{event.startTime.substring(0, 5)} - {event.endTime.substring(0, 5)}</span>
                     </div>
-                    <div className="flex items-center gap-3 text-dark-300">
-                      <div className="p-2 bg-dark-800 rounded-lg"><MapPin size={16} className="text-accent-500" /></div>
-                      <span className="text-sm font-medium truncate max-w-[200px]">{event.location}</span>
+                    <div className="flex items-center gap-2 text-dark-300 text-sm bg-dark-800/50 p-2 rounded-lg">
+                      <MapPin size={16} className="text-accent-500" />
+                      <span className="truncate max-w-[180px] font-medium">{event.location}</span>
                     </div>
-                    <div className="flex items-center gap-3 text-primary-400 font-bold bg-primary-500/5 p-2 rounded-lg border border-primary-500/10">
-                      <DollarSign size={18} />
+                    <div className="flex items-center gap-2 text-primary-400 font-bold bg-primary-500/5 p-2 rounded-lg border border-primary-500/10">
+                      <DollarSign size={16} />
                       <span>{formatCurrency(event.totalAmount)}</span>
                     </div>
                   </div>
@@ -196,51 +186,68 @@ const Schedule: React.FC = () => {
         )}
       </div>
 
-      {/* Monthly Summary Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="card bg-gradient-to-br from-blue-600/5 to-transparent border-blue-600/20">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="p-3 bg-blue-600/20 rounded-xl text-blue-500"><Calendar size={24} /></div>
-            <div>
-              <p className="text-xs text-dark-400 uppercase font-bold tracking-widest">Số lượng show</p>
-              <h3 className="text-3xl font-display font-bold text-white">{summary?.totalEvents || 0}</h3>
-            </div>
-          </div>
-          <div className="w-full bg-dark-800 h-1.5 rounded-full overflow-hidden">
-            <div className="bg-blue-500 h-full w-[70%]" />
-          </div>
-        </div>
+      {/* --- MODALS --- */}
+      
+      {/* 1. Thêm Show */}
+      <CustomModal.ModalCreateAndEdit
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title="Lên Lịch Show Mới"
+        size="lg"
+        formContent={<EventForm onSuccess={() => setIsModalOpen(false)} />}
+      />
 
-        <div className="card bg-gradient-to-br from-accent-600/5 to-transparent border-accent-600/20">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="p-3 bg-accent-600/20 rounded-xl text-accent-500"><DollarSign size={24} /></div>
-            <div>
-              <p className="text-xs text-dark-400 uppercase font-bold tracking-widest">Doanh thu dự kiến</p>
-              <h3 className="text-3xl font-display font-bold text-white">
-                ₫{(summary?.estimatedRevenue || 0) / 1000000}M
-              </h3>
-            </div>
-          </div>
-          <div className="w-full bg-dark-800 h-1.5 rounded-full overflow-hidden">
-            <div className="bg-accent-500 h-full w-[45%]" />
-          </div>
-        </div>
+      {/* 2. Chi tiết Show */}
+      <CustomModal.ModalCreateAndEdit
+        isOpen={isDetailOpen}
+        onClose={() => setIsDetailOpen(false)}
+        title="Chi Tiết Lịch Diễn"
+        size="lg"
+        formContent={
+          <EventDetail 
+            data={currentEventWithMembers} 
+            onAssignClick={handleOpenAssign} 
+          />
+        }
+      />
 
-        <div className="card bg-gradient-to-br from-green-600/5 to-transparent border-green-600/20">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="p-3 bg-green-600/20 rounded-xl text-green-500"><Clock size={24} /></div>
-            <div>
-              <p className="text-xs text-dark-400 uppercase font-bold tracking-widest">Hiệu suất đội</p>
-              <h3 className="text-3xl font-display font-bold text-white">{summary?.completionRate || 0}%</h3>
-            </div>
-          </div>
-          <div className="w-full bg-dark-800 h-1.5 rounded-full overflow-hidden">
-            <div className="bg-green-500 h-full w-[90%]" />
-          </div>
-        </div>
-      </div>
+      {/* 3. Gán đội hình (Dùng list 'users' từ userSlice) */}
+      <CustomModal.ModalCreateAndEdit
+        isOpen={isAssignOpen}
+        onClose={() => setIsAssignOpen(false)}
+        title="Thiết Lập Đội Hình"
+        size="md"
+        formContent={
+          <AssignMemberForm 
+            eventId={selectedEventId || 0}
+            membersList={users} // Dùng trực tiếp list user từ userSlice
+            currentMembers={currentEventWithMembers?.members}
+            loading={loading}
+            onSubmit={onAssignSubmit}
+          />
+        }
+      />
     </div>
   );
+};
+
+const StatCard = ({ title, value, unit, color }: any) => (
+  <div className={`card bg-dark-900/50 border-${color}-500/20 shadow-lg`}>
+    <p className="text-[10px] font-bold text-dark-500 uppercase tracking-widest mb-1">{title}</p>
+    <div className="flex items-baseline gap-2">
+      <h3 className="text-2xl font-black text-white">{value}</h3>
+      <span className="text-xs text-dark-400">{unit}</span>
+    </div>
+  </div>
+);
+
+const getStatusStyle = (status: string) => {
+  switch (status) {
+    case 'ACCEPTED': return 'bg-green-500/10 text-green-500 border-green-500/20';
+    case 'CANCELLED': return 'bg-red-500/10 text-red-500 border-red-500/20';
+    case 'COMPLETED': return 'bg-blue-500/10 text-blue-500 border-blue-500/20';
+    default: return 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20';
+  }
 };
 
 export default Schedule;

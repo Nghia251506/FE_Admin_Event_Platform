@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
-import DashboardService from "@/services/DashboardService";
+import DashboardService from "@/services/dashboardService";
 import { DashboardResponse } from "@/types/dashboard";
 
 // 1. Định nghĩa trạng thái của Dashboard

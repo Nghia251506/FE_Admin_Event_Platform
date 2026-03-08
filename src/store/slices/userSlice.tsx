@@ -133,14 +133,18 @@ const userSlice = createSlice({
       })
       .addCase(fetchUsers.fulfilled, (state, action: PayloadAction<any>) => {
         state.loading = false;
-        // Kiểm tra nếu payload trả về có field users thì lấy, không thì lấy thẳng payload
-        // Tùy thuộc vào việc Backend của ông trả về Page object hay List
-        if (action.payload && action.payload.content) {
-          state.users = action.payload.content;
-        } else if (Array.isArray(action.payload)) {
-          state.users = action.payload;
+        
+        // action.payload bây giờ là { users: [...], total: 5 } từ userService trả về
+        if (action.payload) {
+          // 1. Gán danh sách user để hiển thị 4 ông đầu tiên
+          state.users = action.payload.users || [];
+          
+          // 2. GÁN CÁI NÀY ĐỂ HIỆN PHÂN TRANG:
+          // totalCount từ 0 sẽ nhảy lên 5. 
+          state.totalCount = action.payload.total || 0;
         } else {
           state.users = [];
+          state.totalCount = 0;
         }
       })
       .addCase(fetchUsers.rejected, (state, action) => {
